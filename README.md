@@ -9,9 +9,9 @@ PATCH//PLAY is a split-screen cooperative debugging game built for a hackathon. 
 1. Explore the facility and collect the access key.
 2. Optionally activate the diagnostic scanner with `E`.
 3. Attempt the three-tile bridge and trigger its boundary-condition bug.
-4. Select **REPORT GLITCH** to send the incident to `DEV_02`.
-5. Correct the comparison expression in the debug console.
-6. Run the four real bridge checks and apply the passing patch.
+4. Review the captured evidence, add an observation, and send the incident to `DEV_02`.
+5. Replay the real traversal, inspect the boundary variables, and correct line 05.
+6. Run the four named regression checks and deploy the passing candidate.
 7. Cross the repaired bridge and press `E` at the exit to win.
 
 The initial rule is intentionally broken:
@@ -26,9 +26,11 @@ The bridge must remain stable for steps 1–3 and collapse only after the safe l
 
 - `WASD` or arrow keys: move `PLAYER_01`
 - `E`: interact with the scanner or exit
-- **REPORT GLITCH**: send the bridge failure to the Coder
-- **TEST PATCH**: run the candidate against all four boundary checks
-- **APPLY PATCH**: update the live bridge after all checks pass
+- **SEND INCIDENT**: submit the captured evidence to the Coder
+- **REPLAY**: step through the captured trace without moving the live player
+- **TEST CANDIDATE**: run the candidate against all four boundary checks
+- **DEPLOY PATCH**: update the live bridge after all checks pass
+- **ROLLBACK**: restore live v0 before final player verification
 - **RESET DEMO**: restore the complete initial state
 
 ## Run locally
@@ -46,13 +48,29 @@ Open the local URL printed by Vite. To create a production build:
 npm run build
 ```
 
+Run the domain regression suite:
+
+```bash
+npm test
+```
+
+The browser smoke test covers the complete keyboard-driven demo:
+
+```bash
+npm run test:e2e
+```
+
 ## Technical approach
 
 - React and Vite
-- One `useReducer` state machine shared by the Gamer and Coder panels
+- One guarded `useReducer` phase machine shared by the Gamer and Coder panels
 - Fixed CSS-grid game world with keyboard movement and collision
-- One authoritative `shouldCollapse` function used by gameplay and tests
+- Deterministic player/world event recording and data-driven incident construction
+- One authoritative `shouldCollapse` function used by gameplay, replay, and tests
 - Restricted expression parsing with no `eval` or arbitrary JavaScript execution
+- Live/candidate rule isolation, revision tracking, deployment gating, and rollback
+- Vitest coverage for rule behavior, phase guards, replay, deployment, victory, and reset
+- Playwright smoke coverage for the complete co-op demo path
 - CSS/SVG-style visuals with no backend, database, authentication, or networking
 
 Core implementation:
@@ -61,6 +79,11 @@ Core implementation:
 src/
   App.jsx
   game.js
+  game/
+    map.js
+    rules.js
+    reducer.js
+    *.test.js
   components/
     GamePanel.jsx
     CoderPanel.jsx
@@ -75,4 +98,4 @@ src/
 
 ## Version
 
-This repository contains **v1**, a focused single-level hackathon prototype demonstrating the complete player-failure-to-code-patch-to-player-verification loop.
+The working tree contains **v2**, a judge-ready single-level vertical slice. It deepens the same player-failure-to-code-patch-to-player-verification loop with authentic evidence, replay, guarded phases, revisioned deployment, and measured co-op victory. The GitHub `main` branch remains the v1 checkpoint until these changes are explicitly committed and pushed.
