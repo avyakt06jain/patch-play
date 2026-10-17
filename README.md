@@ -1,101 +1,99 @@
-# PATCH//PLAY
+# PATCH//PLAY v3
 
-> One plays the problem. The other patches the world.
+> Play the consequences. Change the cause.
 
-PATCH//PLAY is a split-screen cooperative debugging game built for a hackathon. `PLAYER_01` explores a deliberately broken simulation and reports what went wrong. `DEV_02` inspects the resulting evidence, edits the real bridge rule, tests the candidate patch, and deploys it. The Gamer must then verify the repaired world by finishing the level.
+PATCH//PLAY is a local cooperative debugging campaign. `PLAYER_01` explores a facility whose systems are controlled by deliberately broken TypeScript modules. A gameplay failure becomes structured evidence for `DEV_02`, who edits the actual module, runs regression checks in an isolated runtime, deploys a candidate, and hands control back to the player for physical verification.
 
-## Gameplay loop
+The default experience is a judge-friendly 57/43 split screen. Gamer and Coder roles can also be opened in synchronized local windows while the main window remains authoritative.
 
-1. Explore the facility and collect the access key.
-2. Optionally activate the diagnostic scanner with `E`.
-3. Attempt the three-tile bridge and trigger its boundary-condition bug.
-4. Review the captured evidence, add an observation, and send the incident to `DEV_02`.
-5. Replay the real traversal, inspect the boundary variables, and correct line 05.
-6. Run the four named regression checks and deploy the passing candidate.
-7. Cross the repaired bridge and press `E` at the exit to win.
+## Campaign
 
-The initial rule is intentionally broken:
+| Wing | Gameplay | Incident 1 | Incident 2 |
+| --- | --- | --- | --- |
+| Transit | key, scanner, bridge, access gate | boundary collapse | destructive gate authorization |
+| Signal | relays, glyph order, alarm sweep | partial sequence acceptance | seconds/milliseconds mismatch |
+| Cargo | crates, plates, conveyors | ghost occupancy | rectangular map indexing |
+| Reactor | valves, lasers, event queue | missing stable transition | reversed event priority |
 
-```js
-stepsOnBridge >= maxSafeSteps
+Each incident must be produced in the world. Incident 2 stays latent until Incident 1 is patched and verified. Later test runs include the earlier incident as a regression.
+
+## Technical pipeline
+
+```text
+keyboard intent
+  → deterministic world event
+  → live compiled cartridge export
+  → QuickJS result
+  → incident evidence + replay trace
+  → CodeMirror candidate edit
+  → esbuild-wasm compile
+  → active + prior regression tests
+  → guarded deployment
+  → player verification
 ```
 
-The bridge must remain stable for steps 1–3 and collapse only after the safe limit.
+- **React 19 + Vite 8** render the campaign shell and role workspaces.
+- **Canvas 2D** renders the tile world, entities, scanner overlay, lighting, and role-colored facility themes.
+- **CodeMirror 6** supplies a real multi-file TypeScript editing surface with read-only project files, history, search, syntax highlighting, and suspect-line decoration.
+- **esbuild-wasm** bundles only virtual relative imports from the active cartridge. URL, Node, data, and external package imports are rejected.
+- **QuickJS via `quickjs-emscripten`** executes bundles in a Web Worker, separate from the page and React state.
+- **Zod** validates cartridge and worker-message contracts.
+- **BroadcastChannel** synchronizes optional Gamer/Coder windows with the authoritative host snapshot and heartbeat.
+- **Vitest + Playwright** protect reducer gates, cartridges, regression behavior, Guided/Challenge presentation, and the full two-incident Level 1 path.
 
-## Controls
+Candidate code has no DOM, storage, browser global, or network access. The worker applies a 32 MB memory limit, 512 KB stack limit, 50 ms per-call CPU budget, one-second suite ceiling, two-second compilation ceiling, and bounded console output. Candidate and live bundle IDs remain separate; tests never mutate the live world.
 
-- `WASD` or arrow keys: move `PLAYER_01`
-- `E`: interact with the scanner or exit
-- **SEND INCIDENT**: submit the captured evidence to the Coder
-- **REPLAY**: step through the captured trace without moving the live player
-- **TEST CANDIDATE**: run the candidate against all four boundary checks
-- **DEPLOY PATCH**: update the live bridge after all checks pass
-- **ROLLBACK**: restore live v0 before final player verification
-- **RESET DEMO**: restore the complete initial state
+## Project structure
+
+```text
+src/
+  engine/
+    campaignReducer.js     guarded phases, incidents, revisions, events
+    world.js               movement, collision, tile helpers
+  runtime/
+    sandbox.worker.js      esbuild + QuickJS isolation
+    SandboxClient.js       typed request/response bridge
+    contracts.js           Zod cartridge/runtime contracts
+  levels/
+    cartridges.js          four levels, eight defects, virtual projects
+  features/
+    useCampaignRuntime.js  live/candidate orchestration and synchronization
+  components/
+    WorldCanvas.jsx        Canvas facility renderer
+    GamePanel.jsx          Gamer controls, HUD, evidence and verification
+    CodeWorkspace.jsx      CodeMirror editor
+    CoderPanel.jsx         files, incident replay, diff, tests and deployment
+  App.jsx                  menu, role focus, progress and judge view
+```
+
+The legacy v2 domain remains under `src/game/` for checkpoint compatibility. New campaign work lives on the `v3-runtime-campaign` branch; the saved `v2-judge-ready` branch points to the last v2 commit, and GitHub `main` is not overwritten.
 
 ## Run locally
 
-Requirements: Node.js 20 or newer and npm.
+Node.js 20+ is recommended.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. To create a production build:
-
-```bash
-npm run build
-```
-
-Run the domain regression suite:
+Useful checks:
 
 ```bash
 npm test
-```
-
-The browser smoke test covers the complete keyboard-driven demo:
-
-```bash
 npm run test:e2e
+npm run build
 ```
 
-## Technical approach
+## Controls
 
-- React and Vite
-- One guarded `useReducer` phase machine shared by the Gamer and Coder panels
-- Fixed CSS-grid game world with keyboard movement and collision
-- Deterministic player/world event recording and data-driven incident construction
-- One authoritative `shouldCollapse` function used by gameplay, replay, and tests
-- Restricted expression parsing with no `eval` or arbitrary JavaScript execution
-- Live/candidate rule isolation, revision tracking, deployment gating, and rollback
-- Vitest coverage for rule behavior, phase guards, replay, deployment, victory, and reset
-- Playwright smoke coverage for the complete co-op demo path
-- CSS/SVG-style visuals with no backend, database, authentication, or networking
+- `WASD` / arrow keys — move
+- `E` — interact
+- Hold `Q` — scanner overlay
+- `R` — restore the current checkpoint
+- **REPORT TO DEV_02** — hand the captured runtime evidence to the Coder
+- **TEST CANDIDATE** — compile in the Worker and run active plus previous regression tests
+- **DEPLOY** — replace the live bundle only after a passing run
+- **ROLLBACK** — restore the previous live bundle before verification
 
-Core implementation:
-
-```text
-src/
-  App.jsx
-  game.js
-  game/
-    map.js
-    rules.js
-    reducer.js
-    *.test.js
-  components/
-    GamePanel.jsx
-    CoderPanel.jsx
-  styles.css
-```
-
-## Project documents
-
-- `PATCH_PLAY_AGENT_BRIEF.md` — gameplay and functional specification
-- `DESIGN.md` — visual language and interaction guidance
-- `reference-images/` — visual references for the major game states
-
-## Version
-
-The working tree contains **v2**, a judge-ready single-level vertical slice. It deepens the same player-failure-to-code-patch-to-player-verification loop with authentic evidence, replay, guarded phases, revisioned deployment, and measured co-op victory. The GitHub `main` branch remains the v1 checkpoint until these changes are explicitly committed and pushed.
+Guided mode reveals a suspected file and line plus a contextual clue. Challenge mode keeps the same code and tests but removes the source-location assistance. Drafts and campaign completion persist locally; active synchronized state remains in memory.

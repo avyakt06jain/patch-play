@@ -1,64 +1,74 @@
-import { useEffect } from "react";
-import { PHASES, canApplyPatch, parseExpression } from "../game";
+import { useEffect, useState } from "react";
+import { LEVEL_PHASES } from "../engine/campaignReducer";
+import CodeWorkspace from "./CodeWorkspace";
 
-function IncidentPanel({ state }) {
-  if (!state.incident || state.phase === PHASES.FAILURE_DETECTED) return <div className={`incident-placeholder ${state.incident ? "failure-detected" : ""}`}><span>{state.incident ? "!" : "‹/›"}</span><div><strong>{state.incident ? "FAILURE DETECTED · AWAITING REPORT" : "AWAITING PLAYER INCIDENT"}</strong><p>{state.incident ? "The world captured a fault. PLAYER_01 must submit their observation." : "Live gameplay evidence will appear here when the world behaves unexpectedly."}</p></div></div>;
-  const { incident } = state;
-  return <div className="incident-card"><div className="incident-title"><span>!</span><strong>{incident.id} · BOUNDARY FAILURE</strong><em>CAPTURED</em></div><p>{incident.observation}</p><dl><div><dt>expected:</dt><dd>{incident.snapshot.expected}</dd></div><div><dt>observed:</dt><dd className="danger-text">{incident.snapshot.observed}</dd></div><div><dt>suspected:</dt><dd className="danger-text">{incident.source.file}:{String(incident.source.line).padStart(2, "0")}</dd></div><div><dt>evidence:</dt><dd>{incident.scannerAttached ? "runtime + scanner" : "runtime trace"}</dd></div></dl></div>;
+const basename = (path) => path.split("/").at(-1);
+
+function FileTree({ level, session, actions }) {
+  const groups = ["src", "tests", "docs", "types"];
+  return <nav className="file-tree" aria-label="Virtual project files">{groups.map((group) => {
+    const paths = Object.keys(session.files).filter((path) => path.startsWith(`/${group}/`));
+    return <div className="file-group" key={group}><strong>⌄ {group}</strong>{paths.map((path) => <button type="button" className={`${session.selectedFile === path ? "selected" : ""} ${session.dirtyFiles.includes(path) ? "dirty" : ""}`} onClick={() => actions.selectFile(path)} key={path}><span>{path.endsWith(".md") ? "#" : path.endsWith(".d.ts") ? "T" : "TS"}</span>{basename(path)}{level.readOnlyFiles.includes(path) && <i>◇</i>}</button>)}</div>;
+  })}</nav>;
 }
 
-function EvidenceWorkspace({ state, dispatch }) {
-  if (!state.incident || state.phase === PHASES.FAILURE_DETECTED) return null;
-  const trace = state.incident.reproduction;
-  const replayEvent = state.replay.active ? trace[state.replay.index] : null;
-  const replaySteps = replayEvent?.payload?.stepsOnBridge ?? "—";
-  return <div className="evidence-workspace">
-    <section className="trace-panel"><div className="section-heading"><strong>REPRODUCTION TRACE</strong><button className="replay-button" type="button" onClick={() => dispatch({ type: state.replay.active ? "STOP_REPLAY" : "START_REPLAY" })}>{state.replay.active ? "■ STOP" : "▷ REPLAY"}</button></div><div className="trace-list">{trace.slice(-7).map((entry, index) => <p className={state.replay.active && Math.max(0, trace.length - 7) + index === state.replay.index ? "active" : ""} key={entry.sequence}><span>{String(entry.sequence).padStart(2, "0")}</span><code>{entry.type === "MOVE" ? entry.message.split(" →")[0] : entry.message}</code></p>)}</div><small>Replay is read-only. The live player never moves.</small></section>
-    <section className="variable-panel"><div className="section-heading"><strong>VARIABLE INSPECTOR</strong><span>{state.replay.active ? `FRAME ${state.replay.index + 1}/${trace.length}` : "FAILURE SNAPSHOT"}</span></div><dl><div><dt>stepsOnBridge</dt><dd>{state.replay.active ? replaySteps : state.incident.snapshot.stepsOnBridge}</dd></div><div><dt>maxSafeSteps</dt><dd>{state.incident.snapshot.maxSafeSteps}</dd></div><div><dt>comparison</dt><dd className="danger-text">{state.incident.snapshot.liveOperator}</dd></div><div><dt>result</dt><dd className="danger-text">{replayEvent?.type === "COLLAPSE" || !state.replay.active ? "collapse" : "stable"}</dd></div></dl></section>
-  </div>;
+function IncidentWorkspace({ level, session }) {
+  const definition = level.incidents[session.activeIncidentIndex];
+  const record = session.incidents[session.activeIncidentIndex];
+  if (!record || ["active", "latent"].includes(record.status)) return <div className="coder-empty"><span>⌁</span><strong>AWAITING PLAYER INCIDENT</strong><p>The active cartridge is producing live world events. Evidence will open the relevant project context.</p></div>;
+  return <div className="coder-incident"><div className="incident-row"><span>!</span><strong>{definition.id} · {definition.title}</strong><em>{record.status.toUpperCase()}</em></div><div className="incident-grid"><label>OBSERVED<code>{JSON.stringify(record.evidence?.observed)}</code></label><label>EXPECTED<code>{JSON.stringify(record.evidence?.expected)}</code></label><label>FUNCTION<code>{record.evidence?.functionName}</code></label><label>SOURCE<code>{session.difficulty === "guided" ? `${basename(definition.file)}:${definition.line}` : "TRACE REQUIRED"}</code></label></div></div>;
 }
 
-function CodeEditor({ state, dispatch }) {
-  const editable = [PHASES.INCIDENT_REPORTED, PHASES.CANDIDATE_EDITING, PHASES.CANDIDATE_TESTED].includes(state.phase);
-  const parsed = parseExpression(state.rule.draftExpression);
-  return <><div className="revision-rail"><span className={state.rule.deployedRevision === 0 ? "live" : ""}>LIVE v{state.rule.deployedRevision}</span><i>→</i><span className={editable ? "candidate" : ""}>CANDIDATE v{state.rule.candidateRevision}</span><i>→</i><span className={state.phase === PHASES.PATCH_DEPLOYED ? "deployed" : ""}>DEPLOYED v{state.rule.deployedRevision || "—"}</span></div>
-    <div className="editor-shell"><div className="editor-tab"><span className="file-dot" /> bridge.rules.js <i>×</i></div><div className="code-editor" aria-label="Bridge rule source editor">
-      <div className="code-line"><span>1</span><code><b>const</b> maxSafeSteps = <strong>3</strong>;</code></div><div className="code-line"><span>2</span><code>&nbsp;</code></div><div className="code-line"><span>3</span><code><b>function</b> shouldCollapse(stepsOnBridge) {'{'}</code></div><div className="code-line"><span>4</span><code className="comment">// Collapse only after the safe limit.</code></div>
-      <div className={`code-line editable-line ${state.incident && state.phase !== PHASES.FAILURE_DETECTED ? "suspect-line" : ""}`}><span>5</span><label><i>return</i><input aria-label="Bridge comparison expression" value={state.rule.draftExpression} disabled={!editable} spellCheck="false" onChange={(event) => dispatch({ type: "EDIT_DRAFT", value: event.target.value })} /><i>;</i></label></div><div className="code-line"><span>6</span><code>{'}'}</code></div>
-    </div></div>
-    {state.incident && state.phase !== PHASES.FAILURE_DETECTED && <div className="rule-diff"><div><span>LIVE</span><code>stepsOnBridge <b>{state.rule.liveOperator}</b> maxSafeSteps</code></div><div><span>CANDIDATE</span><code className={parsed.valid ? "candidate-code" : "danger-text"}>{parsed.valid ? parsed.normalized : "INVALID EXPRESSION"}</code></div></div>}
-  </>;
+function TestExplorer({ session }) {
+  return <section className="test-explorer"><header><strong>TEST EXPLORER</strong><span className={`test-state ${session.tests.status}`}>{session.tests.status === "passed" ? `${session.tests.results.length}/${session.tests.results.length} PASSED` : session.tests.status.toUpperCase()}</span></header>{session.tests.error && <div className="runtime-diagnostic">! {session.tests.error}</div>}{session.tests.results.length ? <div className="test-v3-list">{session.tests.results.map((test, index) => <div className={test.passed ? "passed" : "failed"} key={`${test.incidentId}-${index}`}><span>{test.passed ? "✓" : "×"}</span><p><strong>{test.incidentId} · {test.name}</strong><small>expected {JSON.stringify(test.expected)} · observed {JSON.stringify(test.observed)}</small></p></div>)}</div> : <p className="test-placeholder">Compile the candidate and run every unlocked contract plus previous regressions.</p>}</section>;
 }
 
-function TestPanel({ state }) {
-  const results = state.rule.testResults;
-  const passing = results?.every((test) => test.passed);
-  return <div className="test-panel"><div className="test-heading"><strong>BOUNDARY REGRESSION SUITE</strong><span className={passing ? "pass-text" : ""}>{results ? `${results.filter((test) => test.passed).length}/4 PASSED` : "NOT RUN"}</span></div>
-    {state.rule.testError && <div className="parser-error">! {state.rule.testError}</div>}
-    {!results ? <div className="test-empty">{["Entry", "Midpoint", "Boundary", "Overflow"].map((name, index) => <span key={name}><i>{index + 1}</i> {name} —</span>)}</div> : <div className="test-rows">{results.map((test) => <div className={`named-test ${test.passed ? "test-pass" : "test-fail"}`} key={test.id}><span>{test.passed ? "✓" : "×"}</span><div><strong>{test.name}</strong><small>Step {test.step}: expected {test.expected}, observed {test.observed}</small>{!test.passed && <em>{test.reason}</em>}</div></div>)}</div>}
-  </div>;
-}
-
-export default function CoderPanel({ state, dispatch }) {
+function ReproductionTrace({ record }) {
+  const events = record?.trace ?? [];
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => { setIndex(0); setPlaying(false); }, [record?.id]);
   useEffect(() => {
-    if (!state.replay.active) return undefined;
-    const timer = window.setTimeout(() => dispatch({ type: "ADVANCE_REPLAY" }), 650);
-    return () => window.clearTimeout(timer);
-  }, [state.replay.active, state.replay.index, dispatch]);
-  const testsPassing = state.rule.testResults?.every((test) => test.passed);
-  const patchLive = state.phase === PHASES.PATCH_DEPLOYED;
-  return <section className="role-panel coder-panel" aria-labelledby="coder-title">
-    <div className="role-header coder-header"><div><span className="role-icon coder-icon">⬡</span><h2 id="coder-title">DEV_02 <em>/</em> DEBUG WORKSPACE</h2><span className="live-pill coder-live">RULESET LIVE</span></div></div>
-    <div className="coder-scroll">
-      <IncidentPanel state={state} />
-      <EvidenceWorkspace state={state} dispatch={dispatch} />
-      {state.incident && ![PHASES.FAILURE_DETECTED, PHASES.PATCH_DEPLOYED, PHASES.VERIFIED].includes(state.phase) && <div className="hint-card"><span>◉</span><div><strong>BOUNDARY HINT · LINE 05</strong><p>The third tile is permitted by the contract. Compare the exact-limit behavior with the step after it.</p>{state.incident.scannerAttached && <small>SCAN ATTACHMENT: at equality, the live rule returns collapse.</small>}</div></div>}
-      <CodeEditor state={state} dispatch={dispatch} />
-      {patchLive && <div className="deployed-card"><span>✓</span><div><strong>AWAITING PLAYER VERIFICATION</strong><p>Candidate v{state.rule.deployedRevision} is live. Automated checks cannot finish the mission.</p></div></div>}
-      <TestPanel state={state} />
-      <div className="event-log"><h3>DETERMINISTIC EVENT STREAM</h3><div>{state.events.slice(-6).map((entry) => <p className={`log-${entry.tone}`} key={entry.sequence}><span>&gt;</span> [{String(entry.sequence).padStart(2, "0")}] {entry.actor} · {entry.message}</p>)}</div></div>
+    if (!playing || !events.length) return undefined;
+    const timer = window.setInterval(() => setIndex((current) => {
+      if (current >= events.length - 1) { setPlaying(false); return current; }
+      return current + 1;
+    }), 420);
+    return () => window.clearInterval(timer);
+  }, [playing, events.length]);
+  const current = events[index];
+  return <section className="trace-v3"><header><strong>INCIDENT REPLAY</strong><span>{events.length} EVENTS · NON-MUTATING</span></header>{events.length ? <><div className="replay-controls"><button type="button" onClick={() => setPlaying((value) => !value)}>{playing ? "Ⅱ PAUSE" : "▷ PLAY"}</button><button type="button" onClick={() => setIndex((value) => Math.min(events.length - 1, value + 1))}>STEP →</button><input aria-label="Incident replay position" type="range" min="0" max={events.length - 1} value={index} onChange={(event) => { setPlaying(false); setIndex(Number(event.target.value)); }} /></div><div className="replay-watch"><span>TICK <b>{current?.tick ?? 0}</b></span><span>EVENT <b>{current?.type}</b></span><span>POSITION <b>{current?.payload?.point ? `${current.payload.point.x},${current.payload.point.y}` : "—"}</b></span></div>{events.slice(Math.max(0, index - 2), index + 1).map((event) => <p className={event.sequence === current?.sequence ? "current" : ""} key={event.sequence}><span>{String(event.sequence).padStart(2, "0")}</span><code>{event.type} · {event.message}</code></p>)}</> : <div className="empty-trace">No failure trace captured.</div>}</section>;
+}
+
+function CandidateDiff({ session, file }) {
+  if (!session.dirtyFiles.includes(file.path)) return null;
+  const before = session.baselineFiles[file.path]?.split("\n") ?? [];
+  const after = file.content.split("\n");
+  const changes = after.map((line, index) => ({ index, line, before: before[index] })).filter((item) => item.line !== item.before);
+  return <details className="candidate-diff"><summary>LIVE v{session.liveRevision} ↔ CANDIDATE v{session.candidateRevision} · {changes.length} LINE{changes.length === 1 ? "" : "S"}</summary>{changes.slice(0, 8).map((change) => <div key={change.index}><code className="removed">− {change.before ?? ""}</code><code className="added">+ {change.line}</code></div>)}</details>;
+}
+
+export default function CoderPanel({ level, session, actions }) {
+  const definition = level.incidents[session.activeIncidentIndex];
+  const record = session.incidents[session.activeIncidentIndex];
+  const file = { path: session.selectedFile, content: session.files[session.selectedFile], readOnly: level.readOnlyFiles.includes(session.selectedFile) };
+  const canEdit = [LEVEL_PHASES.INCIDENT_REPORTED, LEVEL_PHASES.CANDIDATE_EDITING, LEVEL_PHASES.CANDIDATE_TESTED].includes(session.phase) && !file.readOnly;
+  const suspected = session.difficulty === "guided" && record && !["active", "latent", "detected"].includes(record.status) && session.selectedFile === definition.file ? definition.line : null;
+  const canTest = [LEVEL_PHASES.INCIDENT_REPORTED, LEVEL_PHASES.CANDIDATE_EDITING, LEVEL_PHASES.CANDIDATE_TESTED].includes(session.phase);
+  return <section className="v3-role coder-panel-v3">
+    <header className="v3-role-header"><div><span className="role-badge amber">D2</span><div><strong>DEV_02</strong><small>CODE WORKSPACE · QUICKJS SANDBOX</small></div></div><span className={`runtime-pill amber ${session.compile.status}`}>{session.compile.status.toUpperCase()}</span></header>
+    <IncidentWorkspace level={level} session={session} />
+    {record && !["active", "latent", "detected"].includes(record.status) && <div className="debug-hint"><span>◉</span><div><strong>{session.difficulty === "guided" ? `GUIDED TRACE · ${basename(definition.file)}:${definition.line}` : "CHALLENGE TRACE"}</strong><p>{definition.hint}</p>{session.scannerActive && <small>SCANNER: {definition.scannerHint}</small>}</div></div>}
+    <div className="ide-shell">
+      <FileTree level={level} session={session} actions={actions} />
+      <div className="editor-column"><div className="editor-tabs"><span className={session.dirtyFiles.includes(file.path) ? "dirty" : ""}>{basename(file.path)}{file.readOnly && " · READ ONLY"}</span>{session.dirtyFiles.includes(file.path) && <button type="button" onClick={() => actions.restoreFile(file.path)}>RESTORE</button>}</div><CodeWorkspace file={{ ...file, readOnly: file.readOnly || !canEdit }} suspectLine={suspected} onChange={(content) => actions.editFile(file.path, content)} /><CandidateDiff session={session} file={file} /></div>
     </div>
-    <div className="coder-actions"><button className="test-button" type="button" disabled={![PHASES.INCIDENT_REPORTED, PHASES.CANDIDATE_EDITING, PHASES.CANDIDATE_TESTED].includes(state.phase)} onClick={() => dispatch({ type: "TEST_PATCH" })}>▷ TEST CANDIDATE</button><button className="apply-button" type="button" disabled={!canApplyPatch(state)} onClick={() => dispatch({ type: "APPLY_PATCH" })}>⇧ DEPLOY PATCH</button>{patchLive && <button className="rollback-button" type="button" onClick={() => dispatch({ type: "ROLLBACK_PATCH" })}>↶ ROLLBACK</button>}</div>
-    <p className="action-help">{state.phase === PHASES.VERIFIED ? "Live v1 · deployment verified by PLAYER_01." : patchLive ? "Live v1 · rollback remains available until player victory." : testsPassing ? "4/4 passed · candidate is eligible for deployment." : "Testing is isolated from the live world."}</p>
+    <div className="debug-lower">
+      <ReproductionTrace record={record} />
+      <TestExplorer session={session} />
+    </div>
+    {session.compile.error && <div className="runtime-diagnostic">SANDBOX DIAGNOSTIC · {session.compile.error}</div>}
+    <div className="revision-strip"><span>LIVE v{session.liveRevision}</span><i>→</i><span className={session.dirtyFiles.length ? "candidate" : ""}>CANDIDATE v{session.candidateRevision}</span><i>·</i><span>{session.dirtyFiles.length} CHANGED FILE{session.dirtyFiles.length === 1 ? "" : "S"}</span><i>·</i><span>NO DOM · NO NETWORK · NO EVAL</span></div>
+    <div className="coder-actions-v3"><button type="button" className="test-candidate" disabled={!canTest || session.tests.status === "running"} onClick={actions.runTests}>▷ {session.tests.status === "running" ? "RUNNING…" : "TEST CANDIDATE"}</button><button type="button" className="deploy-candidate" disabled={session.tests.status !== "passed" || session.phase !== LEVEL_PHASES.CANDIDATE_TESTED} onClick={actions.deploy}>⇧ DEPLOY v{session.candidateRevision}</button>{session.phase === LEVEL_PHASES.PATCH_DEPLOYED && <button type="button" className="rollback-candidate" onClick={actions.rollback}>↶ ROLLBACK</button>}</div>
   </section>;
 }
