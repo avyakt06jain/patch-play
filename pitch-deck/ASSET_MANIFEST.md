@@ -1,68 +1,44 @@
 # Screenshot asset manifest
 
-All assets are 1600×900 PNG captures from the running local prototype.
+All images are direct 1600×900 captures from the running local prototype.
 
-## `01-campaign-menu.png`
+## Four screenshots for the main deck
 
-Campaign selection with all four wings, eight-defect count, Guided/Challenge choice, and the core product statement. Primary use: title slide.
+### `04-live-incident.png`
 
-## `02-level1-split-start.png`
+The bridge failure immediately after gameplay reproduces it. Use on slide 2 for the problem and visible consequence.
 
-Default 57/43 Gamer/Coder layout before an incident. Primary use: product concept and role explanation.
+### `02-level1-split-start.png`
 
-## `03-under-the-hood.png`
+The default Gamer/Coder split before an incident. Use on slide 3 to explain the two roles.
 
-Judge drawer showing the runtime data path, active export, live/candidate revisions, QuickJS limits, and captured-event count. Primary use: architecture slide.
+### `07-tests-passed.png`
 
-## `04-live-incident.png`
+The corrected TypeScript rule, candidate diff, passing boundary tests, and enabled deployment action. Use on slide 4 for technical proof.
 
-The bridge boundary failure immediately after gameplay reproduces it. The red overlay and incident evidence are visible. Primary use: problem slide.
+### `10-wing-stabilized.png`
 
-## `05-coder-diagnosis.png`
+Both Level 1 incidents verified with the green completion overlay. Use on slide 5 for deployment and player verification.
 
-Reported incident with source location, contextual hint, highlighted file, replay controls, and test explorer. Primary use: debugging pipeline slide.
+## Backup captures
 
-## `06-detached-coder.png`
+The following images remain in the folder for judge questions, documentation, or a future longer deck. Do not place them in the seven-slide main deck.
 
-Full-width Coder role window connected to the authoritative host. Primary use: synchronization and collaboration slide.
-
-## `07-tests-passed.png`
-
-Edited bridge rule with `4/4 PASSED`, candidate diff, and deploy button enabled while the world remains unchanged. Primary use: technical depth slide.
-
-## `08-patch-deployed.png`
-
-Candidate v1 deployed and awaiting Gamer verification. Primary use: first half of deployment/verification slide.
-
-## `09-second-incident.png`
-
-Gate incident produced after the bridge patch was verified. Primary use: backup slide for sequential defects and regression coverage.
-
-## `10-wing-stabilized.png`
-
-Both Level 1 incidents verified with the green completion overlay. Primary use: second half of deployment/verification slide.
-
-## `11-campaign-progress.png`
-
-Campaign menu after Transit Wing completion. Primary use: closing slide background.
-
-## `12-signal-wing.png`
-
-Violet Signal Wing world with its sequence validator source visible. Primary use: campaign breadth slide.
-
-## `13-cargo-wing.png`
-
-Amber Cargo Wing world with crates, plates, conveyors, and occupancy source. Primary use: campaign breadth slide.
-
-## `14-reactor-wing.png`
-
-Red/green Reactor Wing world with valves, lasers, patrol marker, and state-transition source. Primary use: campaign breadth slide.
+- `01-campaign-menu.png`: all four wings and Guided/Challenge selection
+- `03-under-the-hood.png`: runtime data path and QuickJS limits
+- `05-coder-diagnosis.png`: incident evidence, hint, source, and replay
+- `06-detached-coder.png`: synchronized Coder role window
+- `08-patch-deployed.png`: candidate awaiting player verification
+- `09-second-incident.png`: gate defect after the bridge regression
+- `11-campaign-progress.png`: completed Transit Wing on the campaign menu
+- `12-signal-wing.png`: Signal Wing world
+- `13-cargo-wing.png`: Cargo Wing world
+- `14-reactor-wing.png`: Reactor Wing world
 
 ## Capture notes
 
-- The captures use Guided mode.
+- Guided mode was used for the captures.
 - Browser viewport: 1600×900.
-- Reduced motion is enabled for stable screenshots.
-- LocalStorage is cleared before capture, then Level 1 is completed to obtain the campaign-progress state.
+- Reduced motion was enabled.
 - Regenerate all images with `node pitch-deck/capture-screenshots.mjs`.
 
