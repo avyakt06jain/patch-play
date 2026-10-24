@@ -85,6 +85,16 @@ npm run test:e2e
 npm run build
 ```
 
+## Deploy to GitHub Pages
+
+The production build uses repository-relative asset URLs, so it works when served from a project path such as `/patch-play/`.
+
+1. Open **Settings → Pages** in the GitHub repository and choose **GitHub Actions** as the source.
+2. Open **Actions → Deploy PATCH//PLAY to GitHub Pages**.
+3. Run the workflow from the `v3-runtime-campaign` branch.
+
+The workflow installs the locked dependencies, runs the domain test suite, builds the release bundle, and publishes only `dist/`. Local browser verification is available with `npm run test:e2e`.
+
 ## Controls
 
 - `WASD` / arrow keys — move

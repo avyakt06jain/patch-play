@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import GamePanel from "./components/GamePanel";
-import CoderPanel from "./components/CoderPanel";
 import { LEVELS } from "./levels/cartridges";
 import { useCampaignRuntime } from "./features/useCampaignRuntime";
+
+const CoderPanel = lazy(() => import("./components/CoderPanel"));
 
 function CampaignMenu({ runtime }) {
   const [selected, setSelected] = useState(LEVELS[0].id);
@@ -35,7 +36,7 @@ export default function App() {
   return <main className={`v3-app ${runtime.detachedRole ? `detached-role detached-${runtime.detachedRole}` : ""}`}>
     <header className="v3-global-header"><div className="brand-lockup"><span className="brand-mark">//</span><div><h1>PATCH<span>//</span>PLAY</h1><p>{runtime.detachedRole ? `${runtime.detachedRole.toUpperCase()} WINDOW · ${runtime.connection.toUpperCase()}` : "CODE-DRIVEN CAMPAIGN"}</p></div></div><div className="level-lockup"><strong>LEVEL_{level.number} / {level.title}</strong><span>{runtime.difficulty.toUpperCase()} MODE · INCIDENT {session.activeIncidentIndex + 1}/2</span></div>{!runtime.detachedRole && <div className="session-actions"><button type="button" className="hood-button" onClick={() => runtime.openRole("gamer")}>OPEN GAMER</button><button type="button" className="hood-button" onClick={() => runtime.openRole("coder")}>OPEN CODER</button><button type="button" className="hood-button" onClick={() => setHood(true)}>UNDER THE HOOD</button><button type="button" className="hood-button" onClick={runtime.resetLevel}>RESET LEVEL</button><button type="button" className="reset-button" onClick={runtime.exitLevel}>EXIT LEVEL</button></div>}</header>
     <div className="v3-toolbar"><Progress session={session} level={level} />{!runtime.detachedRole && <div className="focus-control"><span>ROLE FOCUS</span>{["player", "split", "coder"].map((value) => <button type="button" className={focus === value ? "active" : ""} onClick={() => setFocus(value)} key={value}>{value.toUpperCase()}</button>)}</div>}</div>
-    <section className={`v3-workspace focus-${focus}`}>{runtime.detachedRole !== "coder" && <GamePanel level={level} session={session} actions={actions} />}{runtime.detachedRole !== "gamer" && <CoderPanel level={level} session={session} actions={actions} />}</section>
+    <section className={`v3-workspace focus-${focus}`}>{runtime.detachedRole !== "coder" && <GamePanel level={level} session={session} actions={actions} />}{runtime.detachedRole !== "gamer" && <Suspense fallback={<section className="v3-role coder-panel-v3"><div className="coder-empty"><span>⌁</span><strong>LOADING CODE WORKSPACE</strong><p>Preparing the multi-file TypeScript editor.</p></div></section>}><CoderPanel level={level} session={session} actions={actions} /></Suspense>}</section>
     {hood && <UnderHood level={level} session={session} onClose={() => setHood(false)} />}
   </main>;
 }

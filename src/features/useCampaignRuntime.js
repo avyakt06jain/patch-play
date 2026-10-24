@@ -44,6 +44,7 @@ export function useCampaignRuntime() {
   const syncRef = useRef({ difficulty, progress });
   const handlersRef = useRef({});
   const clientRef = useRef(null);
+  const evaluatingRef = useRef(false);
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => { syncRef.current = { difficulty, progress }; }, [difficulty, progress]);
   useEffect(() => () => clientRef.current?.terminate(), []);
@@ -95,6 +96,7 @@ export function useCampaignRuntime() {
 
   const move = useCallback(async (direction) => {
     if (detachedRole) { channelRef.current?.postMessage({ type: "ACTION", action: "MOVE", payload: direction }); return; }
+    if (evaluatingRef.current) return;
     const state = sessionRef.current;
     if (!state || state.phase === LEVEL_PHASES.LOADING || state.phase === LEVEL_PHASES.INCIDENT_DETECTED || state.phase === LEVEL_PHASES.LEVEL_COMPLETE) return;
     const level = getLevel(state.levelId);
@@ -105,19 +107,32 @@ export function useCampaignRuntime() {
     const incident = level.incidents[state.activeIncidentIndex];
     const incidentState = state.incidents[state.activeIncidentIndex];
     if (incident?.mode === "enter" && samePoint(target, incident.trigger) && ["active", "patched"].includes(incidentState.status)) {
-      await evaluateTrigger(incident, { ...state, player: target, tick: state.tick + 1 });
+      evaluatingRef.current = true;
+      try {
+        await evaluateTrigger(incident, { ...state, player: target, tick: state.tick + 1 });
+      } finally {
+        evaluatingRef.current = false;
+      }
     }
   }, [detachedRole, dispatch, evaluateTrigger]);
 
   const interact = useCallback(async () => {
     if (detachedRole) { channelRef.current?.postMessage({ type: "ACTION", action: "INTERACT" }); return; }
+    if (evaluatingRef.current) return;
     const state = sessionRef.current;
     if (!state) return;
     const level = getLevel(state.levelId);
     if (isNear(state.player, level.scanner) && !state.scannerActive) { dispatch({ type: "SCANNER_ON" }); return; }
     const incident = level.incidents[state.activeIncidentIndex];
     const incidentState = state.incidents[state.activeIncidentIndex];
-    if (incident?.mode === "interact" && isNear(state.player, incident.trigger) && ["active", "patched"].includes(incidentState.status)) await evaluateTrigger(incident, state);
+    if (incident?.mode === "interact" && isNear(state.player, incident.trigger) && ["active", "patched"].includes(incidentState.status)) {
+      evaluatingRef.current = true;
+      try {
+        await evaluateTrigger(incident, state);
+      } finally {
+        evaluatingRef.current = false;
+      }
+    }
   }, [detachedRole, dispatch, evaluateTrigger]);
 
   const editFile = useCallback((path, content) => {

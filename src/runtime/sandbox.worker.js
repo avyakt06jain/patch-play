@@ -70,7 +70,11 @@ async function execute(bundleId, calls) {
   const runtime = QuickJS.newRuntime();
   runtime.setMemoryLimit(32 * 1024 * 1024);
   runtime.setMaxStackSize(512 * 1024);
-  const deadline = performance.now() + Math.min(1000, 50 * Math.max(1, calls.length));
+  // QuickJS interrupt checks use wall-clock time. Keep the 50 ms-per-call
+  // execution target, but allow scheduling grace so a valid hook is not
+  // rejected when the browser briefly deprioritizes the Worker.
+  const executionBudget = 50 * Math.max(1, calls.length);
+  const deadline = performance.now() + Math.min(1000, Math.max(250, executionBudget + 200));
   runtime.setInterruptHandler(() => performance.now() > deadline);
   const context = runtime.newContext();
   const logs = [];
