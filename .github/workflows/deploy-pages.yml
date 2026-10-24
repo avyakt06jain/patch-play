@@ -1,6 +1,9 @@
 name: Deploy PATCH//PLAY to GitHub Pages
 
 on:
+  push:
+    branches:
+      - v3-runtime-campaign
   workflow_dispatch:
 
 permissions:
